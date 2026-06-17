@@ -284,23 +284,32 @@ WHAT TO AVOID — these are dealbreakers:
 
 STRUCTURE:
 - Write in first person as Rob
-- Linear timeline, topic-focused chapters — let chapter length follow the material, not a target word count
-- Short chapters are fine. A good story about the dentist can be 800 words. A contemplative chapter about what intelligence work actually is can be 6,000.
-- Scene breaks with *** where the scene shifts
+- Linear timeline, topic-focused chapters
+- Each chapter should be substantial — 1,500 to 4,000 words. Don't rush through stories.
+- Scene breaks with *** where the scene shifts within a chapter
 - For civilian readers — explain military context naturally through the story, never in asides or footnotes
 - Include a brief author's note at the start that sounds like Rob wrote it, not an AI
 
+EXPANSION — this is critical:
+- Each interview answer is raw material, not a summary to copy. Your job is to EXPAND it into living prose.
+- Add scene-setting: where are we, what does it look, sound, smell like?
+- Add interior monologue: what was Rob thinking in the moment?
+- Add the small telling details that make a scene feel real
+- If an answer mentions something briefly, slow down and write the actual scene
+- Do not compress or summarize — expand. A two-sentence answer can become three pages.
+- Target: at least 300 words of prose per interview answer on average
+
 Style notes from Rob: ${styleNotes.join('; ') || 'none yet'}
-Phase: ${phase === 'rough_draft' ? 'Rough draft — capture everything, find the structure, get it all down. Completeness over polish.' : 'First draft — tighten the prose, sharpen the humor, trust the reader more.'}`
+Phase: ${phase === 'rough_draft' ? 'Rough draft — capture everything, find the structure, get it all down. Completeness over polish. Write long — you can always cut later, but you cannot cut what was never written.' : 'First draft — tighten the prose, sharpen the humor, trust the reader more.'}`
 
   const transcript = allAnswers
     .map(a => `Q: ${a.question}\nA: ${a.answer}`)
     .join('\n\n')
 
   return callGrok(
-    `Here is the complete interview transcript. Write the memoir:\n\n${transcript}`,
+    `Here is the complete interview transcript with ${allAnswers.length} questions and answers. Write the memoir. Expand every story into full scenes — do not summarize. Write long:\n\n${transcript}`,
     system,
-    8192
+    32000
   )
 }
 
