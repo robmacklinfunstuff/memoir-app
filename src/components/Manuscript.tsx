@@ -53,10 +53,16 @@ export default function Manuscript() {
     setStatus(`Generating ${targetPhase === 'rough_draft' ? 'rough draft' : 'first draft'} from ${answers.length} answers — writing now, content will appear as it streams in...`)
 
     try {
-      const content = await generateManuscript(answers, styleNotes, targetPhase, (partial) => {
-        setManuscript(partial)
-        setWordCount(partial.split(/\s+/).length)
-      })
+      const content = await generateManuscript(
+        answers,
+        styleNotes,
+        targetPhase,
+        (partial) => {
+          setManuscript(partial)
+          setWordCount(partial.split(/\s+/).length)
+        },
+        (msg) => setStatus(msg)
+      )
       const wc = content.split(/\s+/).length
       const newVersion = version + 1
 
@@ -71,9 +77,9 @@ export default function Manuscript() {
       setWordCount(wc)
       setVersion(newVersion)
       setPhase(targetPhase)
-      setStatus('')
+      setStatus(`Done — ${wc.toLocaleString()} words`)
     } catch (e) {
-      setStatus('Error generating manuscript. Please try again.')
+      setStatus(`Error: ${e instanceof Error ? e.message : String(e)}`)
     }
     setGenerating(false)
   }

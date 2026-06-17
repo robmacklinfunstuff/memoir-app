@@ -248,8 +248,15 @@ async function callClaudeStreaming(
   prompt: string,
   systemPrompt: string,
   maxTokens: number,
-  onProgress?: (partial: string) => void
+  onProgress?: (partial: string) => void,
+  onStatus?: (msg: string) => void
 ): Promise<string> {
+  if (!ANTHROPIC_API_KEY) {
+    throw new Error('VITE_ANTHROPIC_API_KEY is not set — add it to Netlify environment variables and redeploy')
+  }
+
+  onStatus?.(`Connecting to Claude API (key: ...${ANTHROPIC_API_KEY.slice(-4)})`)
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -267,6 +274,8 @@ async function callClaudeStreaming(
     })
   })
 
+  onStatus?.(`Claude responded: HTTP ${response.status}`)
+
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}))
     throw new Error(errData.error?.message || `Anthropic API error ${response.status}`)
@@ -276,6 +285,7 @@ async function callClaudeStreaming(
   const decoder = new TextDecoder()
   let content = ''
   let buffer = ''
+  let tokenCount = 0
 
   try {
     while (true) {
@@ -293,13 +303,23 @@ async function callClaudeStreaming(
           const parsed = JSON.parse(trimmed.slice(6))
           if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
             content += parsed.delta.text
+            tokenCount++
             onProgress?.(content)
+          }
+          if (parsed.type === 'message_delta') {
+            const reason = parsed.delta?.stop_reason
+            const outTokens = parsed.usage?.output_tokens
+            onStatus?.(`Claude finished: stop_reason=${reason}, output_tokens=${outTokens}`)
           }
         } catch { /* ignore malformed chunks */ }
       }
     }
   } finally {
     reader.releaseLock()
+  }
+
+  if (!content) {
+    throw new Error('Claude returned empty content — check API key and model access')
   }
 
   return content
@@ -386,7 +406,8 @@ export async function generateManuscript(
   allAnswers: { question: string; answer: string }[],
   styleNotes: string[],
   phase: 'rough_draft' | 'first_draft',
-  onProgress?: (partial: string) => void
+  onProgress?: (partial: string) => void,
+  onStatus?: (msg: string) => void
 ): Promise<string> {
 const system = `You are ghostwriting a memoir by Rob Macklin. Rob is a Naval Reserve Intelligence Officer who was called up and deployed to Iraq with SEAL Team 8 in 2008 as a Lieutenant j.g. He was trained as a HUMINT collector and ran the TIF (Temporary Interrogation Facility), but did much more than that. The memoir is for civilian readers who have never been in the military.
 
@@ -436,7 +457,8 @@ ${numberedTranscript}
 Start with the author's note, then Chapter 1. Keep writing until every answer above is in the manuscript.`,
     system,
     32000,
-    onProgress
+    onProgress,
+    onStatus
   )
 }
 
