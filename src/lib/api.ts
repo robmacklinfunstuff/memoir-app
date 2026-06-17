@@ -350,10 +350,10 @@ WHAT TO AVOID — these are dealbreakers:
 STRUCTURE:
 - Write in first person as Rob
 - Linear timeline, topic-focused chapters
-- Each chapter should be substantial — 1,500 to 4,000 words. Don't rush through stories.
 - Scene breaks with *** where the scene shifts within a chapter
 - For civilian readers — explain military context naturally through the story, never in asides or footnotes
 - Include a brief author's note at the start that sounds like Rob wrote it, not an AI
+- COMPLETENESS IS MANDATORY: you must write prose for every single numbered answer in the transcript. A response that stops before the final answer is an incomplete, failed response. Keep writing chapters until you reach [Answer ${allAnswers.length}].
 
 EXPANSION — this is critical:
 - Each interview answer is raw material, not a summary to copy. Your job is to EXPAND it into living prose.
@@ -362,19 +362,27 @@ EXPANSION — this is critical:
 - Add the small telling details that make a scene feel real
 - If an answer mentions something briefly, slow down and write the actual scene
 - Do not compress or summarize — expand. A two-sentence answer can become three pages.
-- Target: at least 300 words of prose per interview answer on average
+- Target: at least 300 words of prose per interview answer
 
 Style notes from Rob: ${styleNotes.join('; ') || 'none yet'}
-Phase: ${phase === 'rough_draft' ? 'Rough draft — capture everything, find the structure, get it all down. Completeness over polish. Write long — you can always cut later, but you cannot cut what was never written.' : 'First draft — tighten the prose, sharpen the humor, trust the reader more.'}`
+Phase: ${phase === 'rough_draft' ? 'Rough draft — capture everything, find the structure, get it all down. Write every answer. Do not stop early.' : 'First draft — tighten the prose, sharpen the humor, trust the reader more.'}`
 
-  const transcript = allAnswers
-    .map(a => `Q: ${a.question}\nA: ${a.answer}`)
+  const numberedTranscript = allAnswers
+    .map((a, i) => `[Answer ${i + 1} of ${allAnswers.length}]\nQ: ${a.question}\nA: ${a.answer}`)
     .join('\n\n')
 
   return callGrokStreaming(
-    `Here is the complete interview transcript with ${allAnswers.length} questions and answers. Write the memoir. Expand every story into full scenes — do not summarize. Write long:\n\n${transcript}`,
+    `You have ${allAnswers.length} interview answers below, numbered [Answer 1] through [Answer ${allAnswers.length}]. You must transform EVERY SINGLE ONE into memoir prose. Do not stop after a few chapters. Do not summarize. Do not skip. Write chapter after chapter until you have covered all ${allAnswers.length} answers. Stopping before [Answer ${allAnswers.length}] means the task is incomplete.
+
+Expected output: ${allAnswers.length} answers × ~300 words each = ${allAnswers.length * 300}+ words minimum.
+
+COMPLETE TRANSCRIPT — all ${allAnswers.length} answers, you must cover them all:
+
+${numberedTranscript}
+
+Begin with the author's note, then Chapter 1. Keep writing chapters without stopping until every answer above has been incorporated into the manuscript.`,
     system,
-    16000,
+    24000,
     onProgress
   )
 }
