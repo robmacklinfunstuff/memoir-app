@@ -179,6 +179,70 @@ async function callGrok(prompt: string, systemPrompt: string, maxTokens = 1024):
   return data.choices[0].message.content.trim()
 }
 
+async function callGrokStreaming(
+  prompt: string,
+  systemPrompt: string,
+  maxTokens: number,
+  onProgress?: (partial: string) => void
+): Promise<string> {
+  const response = await fetch('https://api.x.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${API_KEY}`
+    },
+    body: JSON.stringify({
+      model: 'grok-3-latest',
+      max_tokens: maxTokens,
+      stream: true,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt }
+      ]
+    })
+  })
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}))
+    throw new Error(errData.error?.message || `API error ${response.status}`)
+  }
+
+  const reader = response.body!.getReader()
+  const decoder = new TextDecoder()
+  let content = ''
+  let buffer = ''
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data: ')) continue
+        const data = trimmed.slice(6)
+        if (data === '[DONE]') continue
+        try {
+          const parsed = JSON.parse(data)
+          const delta = parsed.choices?.[0]?.delta?.content
+          if (delta) {
+            content += delta
+            onProgress?.(content)
+          }
+        } catch { /* ignore malformed chunks */ }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  return content
+}
+
 export async function generateNextQuestion(
   recentHistory: { q: string; a: string }[],
   allTopicsSoFar: string[],
@@ -259,7 +323,8 @@ Gaps should be things that would clearly belong in this memoir but haven't been 
 export async function generateManuscript(
   allAnswers: { question: string; answer: string }[],
   styleNotes: string[],
-  phase: 'rough_draft' | 'first_draft'
+  phase: 'rough_draft' | 'first_draft',
+  onProgress?: (partial: string) => void
 ): Promise<string> {
 const system = `${BOOK_CONTEXT}
 You are ghostwriting Rob Macklin's memoir. Your job is to sound like Rob — not like an AI writing about Rob.
@@ -306,10 +371,11 @@ Phase: ${phase === 'rough_draft' ? 'Rough draft — capture everything, find the
     .map(a => `Q: ${a.question}\nA: ${a.answer}`)
     .join('\n\n')
 
-  return callGrok(
+  return callGrokStreaming(
     `Here is the complete interview transcript with ${allAnswers.length} questions and answers. Write the memoir. Expand every story into full scenes — do not summarize. Write long:\n\n${transcript}`,
     system,
-    32000
+    16000,
+    onProgress
   )
 }
 

@@ -50,10 +50,13 @@ export default function Manuscript() {
     const { data: notes } = await supabase.from('memoir_style_notes').select('note').order('created_at', { ascending: false }).limit(20)
     const styleNotes = notes ? notes.map(n => n.note) : []
 
-    setStatus(`Generating ${targetPhase === 'rough_draft' ? 'rough draft' : 'first draft'} from ${answers.length} answers... This may take a minute.`)
+    setStatus(`Generating ${targetPhase === 'rough_draft' ? 'rough draft' : 'first draft'} from ${answers.length} answers — writing now, content will appear as it streams in...`)
 
     try {
-      const content = await generateManuscript(answers, styleNotes, targetPhase)
+      const content = await generateManuscript(answers, styleNotes, targetPhase, (partial) => {
+        setManuscript(partial)
+        setWordCount(partial.split(/\s+/).length)
+      })
       const wc = content.split(/\s+/).length
       const newVersion = version + 1
 
