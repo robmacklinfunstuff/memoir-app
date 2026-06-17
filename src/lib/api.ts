@@ -388,59 +388,54 @@ export async function generateManuscript(
   phase: 'rough_draft' | 'first_draft',
   onProgress?: (partial: string) => void
 ): Promise<string> {
-const system = `${BOOK_CONTEXT}
-You are ghostwriting Rob Macklin's memoir. Your job is to sound like Rob — not like an AI writing about Rob.
+const system = `You are ghostwriting a memoir by Rob Macklin. Rob is a Naval Reserve Intelligence Officer who was called up and deployed to Iraq with SEAL Team 8 in 2008 as a Lieutenant j.g. He was trained as a HUMINT collector and ran the TIF (Temporary Interrogation Facility), but did much more than that. The memoir is for civilian readers who have never been in the military.
 
-VOICE — what this should sound like:
-- A guy telling stories at a bar to people who weren't there
-- Dry, understated humor — the funny comes from specificity and timing, not from announcing that something is funny
-- Self-deprecating but not self-pitying
-- Genuine — when something was hard or strange or moving, say so plainly without melodrama
-- The rhythm of spoken storytelling, not polished literary prose
-- Specific details over generalizations — not "it was hot" but "the kind of hot where you sweat through your shirt before you leave the building"
+VOICE:
+- First person as Rob. A guy telling stories at a bar — specific, funny, honest.
+- Dry, understated humor. The funny comes from specificity and timing, not from announcing something is funny.
+- Self-deprecating but not self-pitying.
+- When something was hard or strange or moving, say so plainly. No melodrama.
+- Specific details over generalizations — not "it was hot" but "the kind of hot where you sweat through your shirt before you leave the building."
 
-WHAT TO AVOID — these are dealbreakers:
-- Do NOT use words like: profound, journey, surreal, visceral, tapestry, navigate, testament, juxtaposition, haunting, pivotal, resonate
-- Do NOT start sentences with "And yet..." or "But here's the thing..." or "What I didn't know then..."
-- Do NOT editorialize about what experiences meant — let the story speak for itself
-- Do NOT summarize emotions — show the moment instead
-- Do NOT make Rob sound heroic or wise — he's an observer and participant, not a protagonist in an action movie
-- Do NOT use rhetorical questions
-- Do NOT write transitions that announce what's coming next ("Little did I know...")
-- No purple prose, no cinematic descriptions, no dramatization of things that were mundane
+AVOID (dealbreakers):
+- These words: profound, journey, surreal, visceral, tapestry, navigate, testament, juxtaposition, haunting, pivotal, resonate
+- Sentences starting with "And yet..." or "But here's the thing..." or "What I didn't know then..."
+- Editorializing about what experiences meant — let the story do it
+- Summarizing emotions — show the moment instead
+- Making Rob sound heroic. He is an observer and participant, not an action hero.
+- Rhetorical questions
+- Transitions that announce what's coming ("Little did I know...")
+- Purple prose, cinematic descriptions, dramatizing mundane things
+
+EXPANSION (the whole point):
+- Every interview answer is raw material. EXPAND it into living prose.
+- Add scene-setting, interior monologue, small telling details.
+- A two-sentence answer can become two or three pages.
+- Do not summarize. Do not compress. Slow down and write the scene.
 
 STRUCTURE:
-- Write in first person as Rob
 - Linear timeline, topic-focused chapters
-- Scene breaks with *** where the scene shifts within a chapter
-- For civilian readers — explain military context naturally through the story, never in asides or footnotes
-- Include a brief author's note at the start that sounds like Rob wrote it, not an AI
-- Cover every numbered answer in the transcript — do not stop until you reach the last one.
+- Scene breaks with *** where the scene shifts
+- Explain military context through the story, never in asides
+- Start with a brief author's note in Rob's voice
 
-EXPANSION — this is critical:
-- Each interview answer is raw material, not a summary to copy. Your job is to EXPAND it into living prose.
-- Add scene-setting: where are we, what does it look, sound, smell like?
-- Add interior monologue: what was Rob thinking in the moment?
-- Add the small telling details that make a scene feel real
-- If an answer mentions something briefly, slow down and write the actual scene
-- Do not compress or summarize — expand. A two-sentence answer can become three pages.
-- Target: at least 300 words of prose per interview answer
-
-Style notes from Rob: ${styleNotes.join('; ') || 'none yet'}
-Phase: ${phase === 'rough_draft' ? 'Rough draft — capture everything, find the structure, get it all down. Write every answer. Do not stop early.' : 'First draft — tighten the prose, sharpen the humor, trust the reader more.'}`
+${styleNotes.length > 0 ? `Style notes from Rob: ${styleNotes.join('; ')}` : ''}
+${phase === 'first_draft' ? 'This is a first draft pass — tighten the prose, sharpen the humor, trust the reader.' : ''}`
 
   const numberedTranscript = allAnswers
     .map((a, i) => `[Answer ${i + 1} of ${allAnswers.length}]\nQ: ${a.question}\nA: ${a.answer}`)
     .join('\n\n')
 
   return callClaudeStreaming(
-    `Here are ${allAnswers.length} interview answers, numbered [Answer 1] through [Answer ${allAnswers.length}]. Write the complete memoir manuscript — every answer must become prose. Work through them in order, chapter by chapter, until you reach [Answer ${allAnswers.length}].
+    `Below are ${allAnswers.length} interview answers from Rob, numbered [Answer 1] through [Answer ${allAnswers.length}]. Your job is to turn ALL of them into a complete memoir manuscript.
+
+Write chapter by chapter, expanding each answer into full scenes. Do not stop until you have reached and written about [Answer ${allAnswers.length}]. Every answer must appear in the manuscript — none may be skipped or compressed into a sentence.
 
 ${numberedTranscript}
 
-Begin with a brief author's note, then write the chapters. Keep going until every answer above is in the manuscript.`,
+Start with the author's note, then Chapter 1. Keep writing until every answer above is in the manuscript.`,
     system,
-    16000,
+    32000,
     onProgress
   )
 }
