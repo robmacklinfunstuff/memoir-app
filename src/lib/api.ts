@@ -1,6 +1,7 @@
 import { FactFlag } from '../types'
 
 const API_KEY = import.meta.env.VITE_GROK_API_KEY
+const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY
 
 const BOOK_CONTEXT = `This is a memoir by Rob Macklin, a Naval Reserve Intelligence Officer who deployed to Iraq with SEAL Team 8 in 2008 as a Lieutrnant j.g., after being called up for training in 20007.  He was trainined as a humint collector and was the officer in charge of the TIF, or temporary interrogation facility, but did more than that.
 The book is written for a civilian audience who has never been in the military — it should help them genuinely understand what it was like, not just the action but the waiting, the bureaucracy, the absurdity, the humanity.
@@ -243,6 +244,67 @@ async function callGrokStreaming(
   return content
 }
 
+async function callClaudeStreaming(
+  prompt: string,
+  systemPrompt: string,
+  maxTokens: number,
+  onProgress?: (partial: string) => void
+): Promise<string> {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-8',
+      max_tokens: maxTokens,
+      stream: true,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  })
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}))
+    throw new Error(errData.error?.message || `Anthropic API error ${response.status}`)
+  }
+
+  const reader = response.body!.getReader()
+  const decoder = new TextDecoder()
+  let content = ''
+  let buffer = ''
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data: ')) continue
+        try {
+          const parsed = JSON.parse(trimmed.slice(6))
+          if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+            content += parsed.delta.text
+            onProgress?.(content)
+          }
+        } catch { /* ignore malformed chunks */ }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  return content
+}
+
 export async function generateNextQuestion(
   recentHistory: { q: string; a: string }[],
   allTopicsSoFar: string[],
@@ -353,7 +415,7 @@ STRUCTURE:
 - Scene breaks with *** where the scene shifts within a chapter
 - For civilian readers — explain military context naturally through the story, never in asides or footnotes
 - Include a brief author's note at the start that sounds like Rob wrote it, not an AI
-- COMPLETENESS IS MANDATORY: you must write prose for every single numbered answer in the transcript. A response that stops before the final answer is an incomplete, failed response. Keep writing chapters until you reach [Answer ${allAnswers.length}].
+- Cover every numbered answer in the transcript — do not stop until you reach the last one.
 
 EXPANSION — this is critical:
 - Each interview answer is raw material, not a summary to copy. Your job is to EXPAND it into living prose.
@@ -371,18 +433,14 @@ Phase: ${phase === 'rough_draft' ? 'Rough draft — capture everything, find the
     .map((a, i) => `[Answer ${i + 1} of ${allAnswers.length}]\nQ: ${a.question}\nA: ${a.answer}`)
     .join('\n\n')
 
-  return callGrokStreaming(
-    `You have ${allAnswers.length} interview answers below, numbered [Answer 1] through [Answer ${allAnswers.length}]. You must transform EVERY SINGLE ONE into memoir prose. Do not stop after a few chapters. Do not summarize. Do not skip. Write chapter after chapter until you have covered all ${allAnswers.length} answers. Stopping before [Answer ${allAnswers.length}] means the task is incomplete.
-
-Expected output: ${allAnswers.length} answers × ~300 words each = ${allAnswers.length * 300}+ words minimum.
-
-COMPLETE TRANSCRIPT — all ${allAnswers.length} answers, you must cover them all:
+  return callClaudeStreaming(
+    `Here are ${allAnswers.length} interview answers, numbered [Answer 1] through [Answer ${allAnswers.length}]. Write the complete memoir manuscript — every answer must become prose. Work through them in order, chapter by chapter, until you reach [Answer ${allAnswers.length}].
 
 ${numberedTranscript}
 
-Begin with the author's note, then Chapter 1. Keep writing chapters without stopping until every answer above has been incorporated into the manuscript.`,
+Begin with a brief author's note, then write the chapters. Keep going until every answer above is in the manuscript.`,
     system,
-    24000,
+    16000,
     onProgress
   )
 }
