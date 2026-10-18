@@ -443,23 +443,57 @@ STRUCTURE:
 ${styleNotes.length > 0 ? `Style notes from Rob: ${styleNotes.join('; ')}` : ''}
 ${phase === 'first_draft' ? 'This is a first draft pass — tighten the prose, sharpen the humor, trust the reader.' : ''}`
 
-  const numberedTranscript = allAnswers
-    .map((a, i) => `[Answer ${i + 1} of ${allAnswers.length}]\nQ: ${a.question}\nA: ${a.answer}`)
-    .join('\n\n')
+  const ANSWERS_PER_CHUNK = 20
+  const chunks: Array<typeof allAnswers> = []
+  for (let i = 0; i < allAnswers.length; i += ANSWERS_PER_CHUNK) {
+    chunks.push(allAnswers.slice(i, i + ANSWERS_PER_CHUNK))
+  }
 
-  return callClaudeStreaming(
-    `Below are ${allAnswers.length} interview answers from Rob, numbered [Answer 1] through [Answer ${allAnswers.length}]. Your job is to turn ALL of them into a complete memoir manuscript.
+  let fullManuscript = ''
 
-Write chapter by chapter, expanding each answer into full scenes. Do not stop until you have reached and written about [Answer ${allAnswers.length}]. Every answer must appear in the manuscript — none may be skipped or compressed into a sentence.
+  for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
+    const chunk = chunks[chunkIdx]
+    const startNum = chunkIdx * ANSWERS_PER_CHUNK + 1
+    const endNum = startNum + chunk.length - 1
+    const isFirst = chunkIdx === 0
+    const isLast = chunkIdx === chunks.length - 1
 
-${numberedTranscript}
+    onStatus?.(`Writing section ${chunkIdx + 1} of ${chunks.length} (answers ${startNum}–${endNum} of ${allAnswers.length})...`)
 
-Start with the author's note, then Chapter 1. Keep writing until every answer above is in the manuscript.`,
-    system,
-    32000,
-    onProgress,
-    onStatus
-  )
+    const numberedChunk = chunk
+      .map((a, i) => `[Answer ${startNum + i} of ${allAnswers.length}]\nQ: ${a.question}\nA: ${a.answer}`)
+      .join('\n\n')
+
+    let prompt: string
+    if (isFirst) {
+      prompt = `Below are interview answers ${startNum}–${endNum} of ${allAnswers.length} total from Rob. This is Part 1 of ${chunks.length}.
+
+Write the author's note and the opening chapters covering these answers. Expand each answer into full scenes — a two-sentence answer should become two or three pages. Do not stop until you have covered all ${chunk.length} answers in this section.
+
+${numberedChunk}`
+    } else {
+      prompt = `Continue the memoir. This is Part ${chunkIdx + 1} of ${chunks.length}.
+
+You are now covering answers ${startNum}–${endNum} of ${allAnswers.length} total. ${isLast ? 'This is the final section — after covering these answers, bring the manuscript to a natural close.' : `Write the next chapters for these answers, ending after [Answer ${endNum}].`}
+
+Expand each answer into full scenes. Continue directly — do not reintroduce the book or recap what came before.
+
+${numberedChunk}`
+    }
+
+    const chunkContent = await callClaudeStreaming(
+      prompt,
+      system,
+      64000,
+      (partial) => onProgress?.(fullManuscript + partial),
+      onStatus
+    )
+
+    fullManuscript += (chunkIdx > 0 ? '\n\n' : '') + chunkContent
+    onProgress?.(fullManuscript)
+  }
+
+  return fullManuscript
 }
 
 export async function generateSessionSummary(
