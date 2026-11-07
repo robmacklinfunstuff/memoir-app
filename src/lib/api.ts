@@ -412,18 +412,18 @@ Return ONLY valid JSON, no other text.`
 export async function generateTopicMap(
   allAnswers: { question: string; answer: string; topic_tags: string[] }[]
 ): Promise<{ topics: { topic: string; summary: string; answer_count: number; richness: string }[]; gaps: string[] }> {
-  const system = `${BOOK_CONTEXT}
-Analyze interview transcripts and produce a topic coverage map.
-Return JSON only: { "topics": [{ "topic": string, "summary": string, "answer_count": number, "richness": "thin"|"moderate"|"rich" }], "gaps": [string] }
-Gaps should be things that would clearly belong in this memoir but haven't been discussed yet.`
+  const system = `You are analyzing interview transcripts for a memoir by Rob Macklin — a Naval Reserve Intelligence Officer who deployed to Iraq with SEAL Team 8 in 2008. The memoir is for civilian readers: humorous, self-deprecating, honest.
+Analyze the transcript and produce a topic coverage map.
+Return JSON only — no other text: { "topics": [{ "topic": string, "summary": string, "answer_count": number, "richness": "thin"|"moderate"|"rich" }], "gaps": [string] }
+Gaps should be topics that would clearly belong in a military memoir like this but haven't come up yet.`
 
   const transcriptSample = allAnswers
     .slice(-60)
-    .map(a => `Q: ${a.question}\nA: ${a.answer}`)
+    .map(a => `Q: ${a.question}\nA: ${a.answer.slice(0, 400)}`)
     .join('\n\n')
 
   const result = await callClaude(
-    `Here is the interview transcript so far. Generate a topic coverage map:\n\n${transcriptSample}`,
+    `Here are ${allAnswers.length} interview answers (showing up to 60, truncated for length). Generate a topic coverage map:\n\n${transcriptSample}`,
     system,
     4096
   )
