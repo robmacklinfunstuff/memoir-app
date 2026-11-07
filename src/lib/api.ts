@@ -160,6 +160,7 @@ This biography was synthesized from publicly available professional directories 
 Target length: 80,000-100,000 words. Structure: linear timeline with topic-focused chapters of varying length.`
 
 async function callGrok(prompt: string, systemPrompt: string, maxTokens = 1024): Promise<string> {
+  if (!API_KEY) throw new Error('VITE_GROK_API_KEY is not set')
   const response = await fetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -175,8 +176,14 @@ async function callGrok(prompt: string, systemPrompt: string, maxTokens = 1024):
       ]
     })
   })
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}))
+    const msg = errData?.error?.message || errData?.message || errData?.error || `Grok API error ${response.status}`
+    console.error('Grok API error response:', errData)
+    throw new Error(String(msg))
+  }
   const data = await response.json()
-  if (data.error) throw new Error(data.error.message)
+  if (data.error) throw new Error(String(data.error.message || data.error))
   return data.choices[0].message.content.trim()
 }
 

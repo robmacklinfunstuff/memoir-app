@@ -34,7 +34,9 @@ export default function TopicMap() {
         gaps_identified: result.gaps
       })
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error('Topic map generation failed:', e)
+      setError(msg || 'Unknown error — check browser console')
     }
     setLoading(false)
   }
