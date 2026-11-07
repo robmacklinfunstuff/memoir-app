@@ -9,9 +9,11 @@ export default function TopicMap() {
   const [gaps, setGaps] = useState<string[]>([])
   const [generated, setGenerated] = useState(false)
   const [totalAnswers, setTotalAnswers] = useState(0)
+  const [error, setError] = useState('')
 
   async function generate() {
     setLoading(true)
+    setError('')
     const { data: answers } = await supabase
       .from('memoir_answers')
       .select('question, answer, topic_tags')
@@ -22,15 +24,18 @@ export default function TopicMap() {
       return
     }
     setTotalAnswers(answers.length)
-    const result = await generateTopicMap(answers)
-    setTopics(result.topics as TopicEntry[])
-    setGaps(result.gaps)
-    setGenerated(true)
-
-    await supabase.from('memoir_topic_maps').insert({
-      topics_covered: result.topics,
-      gaps_identified: result.gaps
-    })
+    try {
+      const result = await generateTopicMap(answers)
+      setTopics(result.topics as TopicEntry[])
+      setGaps(result.gaps)
+      setGenerated(true)
+      await supabase.from('memoir_topic_maps').insert({
+        topics_covered: result.topics,
+        gaps_identified: result.gaps
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
     setLoading(false)
   }
 
@@ -61,6 +66,12 @@ export default function TopicMap() {
 
       {loading && (
         <div style={s.empty}>Reading {totalAnswers} answers across all sessions...</div>
+      )}
+
+      {error && (
+        <div style={{ ...s.empty, color: '#e24b4a', borderColor: '#3a1a1a', background: '#1a0a0a' }}>
+          Error: {error}
+        </div>
       )}
 
       {generated && (

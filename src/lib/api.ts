@@ -389,17 +389,13 @@ Gaps should be things that would clearly belong in this memoir but haven't been 
     .map(a => `Q: ${a.question}\nA: ${a.answer}`)
     .join('\n\n')
 
-  try {
-    const result = await callGrok(
-      `Here is the interview transcript so far. Generate a topic coverage map:\n\n${transcriptSample}`,
-      system,
-      2048
-    )
-    const clean = result.replace(/```json|```/g, '').trim()
-    return JSON.parse(clean)
-  } catch {
-    return { topics: [], gaps: [] }
-  }
+  const result = await callGrok(
+    `Here is the interview transcript so far. Generate a topic coverage map:\n\n${transcriptSample}`,
+    system,
+    2048
+  )
+  const clean = result.replace(/```json|```/g, '').trim()
+  return JSON.parse(clean)
 }
 
 export async function generateManuscript(
