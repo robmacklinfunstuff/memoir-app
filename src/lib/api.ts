@@ -425,7 +425,7 @@ Gaps should be things that would clearly belong in this memoir but haven't been 
   const result = await callClaude(
     `Here is the interview transcript so far. Generate a topic coverage map:\n\n${transcriptSample}`,
     system,
-    2048
+    4096
   )
   const clean = result.replace(/```json|```/g, '').trim()
   return JSON.parse(clean)
