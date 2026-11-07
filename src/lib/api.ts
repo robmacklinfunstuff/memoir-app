@@ -159,6 +159,32 @@ This biography was synthesized from publicly available professional directories 
 - Temporal context: Career evolution from general corporate/M&A practice to deep specialization in home improvement ecosystem (transactions + advisory + operations).  
 Target length: 80,000-100,000 words. Structure: linear timeline with topic-focused chapters of varying length.`
 
+async function callClaude(prompt: string, systemPrompt: string, maxTokens = 1024): Promise<string> {
+  if (!ANTHROPIC_API_KEY) throw new Error('VITE_ANTHROPIC_API_KEY is not set')
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  })
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}))
+    const msg = errData?.error?.message || errData?.message || `Claude API error ${response.status}`
+    throw new Error(String(msg))
+  }
+  const data = await response.json()
+  return data.content[0].text.trim()
+}
+
 async function callGrok(prompt: string, systemPrompt: string, maxTokens = 1024): Promise<string> {
   if (!API_KEY) throw new Error('VITE_GROK_API_KEY is not set')
   const response = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -359,7 +385,7 @@ Ask questions like a great journalist, not a form. One question at a time. Make 
     ? `Here is the recent conversation:\n\n${historyText}\n\nAsk the single best next question to draw out more of Rob's story. Return only the question, nothing else.`
     : `This is the very first question of the interview. Start somewhere vivid and specific — invite Rob to place himself in a scene from this period of his life. Return only the question.`
 
-  return callGrok(prompt, system, 256)
+  return callClaude(prompt, system, 256)
 }
 
 export async function factCheckAnswer(answer: string): Promise<FactFlag[]> {
@@ -371,7 +397,7 @@ If nothing needs flagging, return an empty array: []
 Return ONLY valid JSON, no other text.`
 
   try {
-    const result = await callGrok(
+    const result = await callClaude(
       `Check this passage for factual claims worth noting:\n\n"${answer}"`,
       system,
       512
@@ -396,7 +422,7 @@ Gaps should be things that would clearly belong in this memoir but haven't been 
     .map(a => `Q: ${a.question}\nA: ${a.answer}`)
     .join('\n\n')
 
-  const result = await callGrok(
+  const result = await callClaude(
     `Here is the interview transcript so far. Generate a topic coverage map:\n\n${transcriptSample}`,
     system,
     2048
@@ -504,5 +530,5 @@ export async function generateSessionSummary(
 ): Promise<string> {
   const system = `Summarize what was discussed in this interview session in 2-3 sentences. Focus on topics and stories covered, not a transcript. Be specific.`
   const transcript = answers.map(a => `Q: ${a.question}\nA: ${a.answer}`).join('\n\n')
-  return callGrok(`Summarize this interview session:\n\n${transcript}`, system, 256)
+  return callClaude(`Summarize this interview session:\n\n${transcript}`, system, 256)
 }
